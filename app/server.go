@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 )
 
 type Request struct {
@@ -42,6 +43,7 @@ func handleRequest(conn net.Conn) {
 	}
 	data := bytes.Split(buf[:b], []byte("\r\n"))
 	sl := bytes.Split(data[0], []byte(" "))
+	
 	req := Request{
 		Method: string(sl[0]),
 		Path: string(sl[1]),
@@ -49,6 +51,13 @@ func handleRequest(conn net.Conn) {
 	}
 	if req.Path == "/" {
 		_, err = conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+		if err != nil {
+			fmt.Println("Error writing to connection: ", err.Error())
+			os.Exit(1)
+		}
+	} else if strings.HasPrefix(req.Path, "/echo/"){
+		body := strings.TrimPrefix(req.Path, "/echo/")
+		_, err = conn.Write([]byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " + fmt.Sprintf("%d", len(body)) + "\r\n\r\n" + body))
 		if err != nil {
 			fmt.Println("Error writing to connection: ", err.Error())
 			os.Exit(1)
