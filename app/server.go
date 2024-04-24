@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"net"
 	"os"
@@ -16,14 +17,17 @@ type Request struct {
 	Body []byte
 }
 
+var dir = flag.String("directory", ".", "Directory to serve files from")
+
 func main() {
-	
+	flag.Parse()
+	fmt.Printf("Directory: %s\n", *dir)
 	l, err := net.Listen("tcp", "0.0.0.0:4221")
 	if err != nil {
 		fmt.Println("Failed to bind to port 4221")
 		os.Exit(1)
 	}
-	fmt.Printf("Listening on %s", l.Addr())
+	fmt.Printf("Listening on %s\n", l.Addr())
 	defer l.Close()
 	for {
 		conn, err := l.Accept()
@@ -69,6 +73,27 @@ func handleRequest(conn net.Conn) {
 			fmt.Println("Error writing to connection: ", err.Error())
 			os.Exit(1)
 		}
+	} else if strings.HasPrefix(req.Path, "/files/") {
+		file := strings.TrimPrefix(req.Path, "/files/")
+		fmt.Println("File: ", file)
+		fp := fmt.Sprint(*dir, string(os.PathSeparator), file)
+		fmt.Println("File Path: ", fp)
+		f, err := os.ReadFile(fp)
+		if err != nil {
+			_, err = conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+			if err != nil {
+				fmt.Println("Error writing to connection: ", err.Error())
+				os.Exit(1)
+			}
+			return
+		}
+		 
+		_, err = conn.Write([]byte("HTTP/1.1 200 OK\r\nContent-Length: " +  fmt.Sprintf("%d\r\n", len(f)) +"Content-Type: application/octet-stream\r\n\r\n" + string(f)))
+		if err != nil {
+			fmt.Println("Error writing to connection: ", err.Error())
+			os.Exit(1)
+		}
+		
 	} else if strings.HasPrefix(req.Path, "/echo/"){
 		body := strings.TrimPrefix(req.Path, "/echo/")
 		_, err = conn.Write([]byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " + fmt.Sprintf("%d", len(body)) + "\r\n\r\n" + body))
